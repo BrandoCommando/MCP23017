@@ -28,6 +28,9 @@ MCP23017_OLATB = 0x15
 class MCP23017(object):
     OUTPUT = 0
     INPUT = 1
+    LOW = 0
+    HIGH = 1
+
     INTMIRRORON = 1
     INTMIRROROFF = 0
     # int pin starts high. when interrupt happens, pin goes low
