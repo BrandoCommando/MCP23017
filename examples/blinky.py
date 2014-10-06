@@ -12,9 +12,9 @@ try:
 		mcp.pinMode(pin, mcp.OUTPUT)
 	while (True):
 		pin = random.randint(5,10)
-		mcp.output(pin, 1)  # Pin 0 High
+		mcp.output(pin, mcp.HIGH)  # Pin 0 High
 		time.sleep(.1)
-		mcp.output(pin, 0)  # Pin 0 Low
+		mcp.output(pin, mcp.LOW)  # Pin 0 Low
 except KeyboardInterrupt:
 	print ("\n Keyboard interrupt!")
 finally:
