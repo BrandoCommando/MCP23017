@@ -26,6 +26,7 @@ MCP23017_OLATA = 0x14
 MCP23017_OLATB = 0x15
 
 class MCP23017(object):
+    # constants
     OUTPUT = 0
     INPUT = 1
     LOW = 0
@@ -45,7 +46,7 @@ class MCP23017(object):
     # register values for use below
     IOCONMIRROR = 6
     IOCONINTPOL = 1
-    # self.direction used primarily for assertions in methods
+
     # set defaults
     def __init__(self, address, num_gpios, busnum=-1):
         assert num_gpios >= 0 and num_gpios <= 16, "Number of GPIOs must be between 0 and 16"
@@ -57,13 +58,17 @@ class MCP23017(object):
         # set defaults
         self.i2c.write8(MCP23017_IODIRA, 0xFF)  # all inputs on port A
         self.i2c.write8(MCP23017_IODIRB, 0xFF)  # all inputs on port B
-        # read the current direction of all pins into instance variable
+        
+	# read the current direction of all pins into instance variable
+	# self.direction used for assertions in a few methods methods
         self.direction = self.i2c.readU8(MCP23017_IODIRA)
         self.direction |= self.i2c.readU8(MCP23017_IODIRB) << 8
+	
 	# disable the pull-ups on all ports
         self.i2c.write8(MCP23017_GPPUA, 0x00)
         self.i2c.write8(MCP23017_GPPUB, 0x00)
-        # clear the IOCON configuration register, which is chip default
+        
+	# clear the IOCON configuration register, which is chip default
         self.i2c.write8(MCP23017_IOCON, 0x00)
 
         ##### interrupt defaults
@@ -125,8 +130,8 @@ class MCP23017(object):
         if (pin < 8):
             gpioa = self._readAndChangePin(MCP23017_IODIRA, pin, mode)
         else:
-        # otherwise use register from second bank
-        # readAndChangePin accepts pin relative to register though, so subtract
+            # otherwise use register from second bank
+            # readAndChangePin accepts pin relative to register though, so subtract
             gpiob = self._readAndChangePin(MCP23017_IODIRB, pin-8, mode) 
         # re-set the direction variable using the new pin modes
         self.direction = gpioa + (gpiob << 8)
@@ -139,9 +144,9 @@ class MCP23017(object):
         # if the pin is < 8, use register from first bank
         if (pin < 8):
             self.outputvalue = self._readAndChangePin(MCP23017_GPIOA, pin, value, self.i2c.readU8(MCP23017_OLATA))
-        # otherwise use register from second bank
-        # readAndChangePin accepts pin relative to register though, so subtract
         else:
+            # otherwise use register from second bank
+            # readAndChangePin accepts pin relative to register though, so subtract
             self.outputvalue = self._readAndChangePin(MCP23017_GPIOB, pin-8, value, self.i2c.readU8(MCP23017_OLATB))
         return self.outputvalue
     
@@ -175,7 +180,6 @@ class MCP23017(object):
         # set the intpol bit
         registerValue = self._changeBit(registerValue, self.IOCONINTPOL, intpol)
         # set ODR pin
-        #registerValue = self._changeBit(registerValue, 2, 1)
         self.i2c.write8(MCP23017_IOCON, registerValue)
         
     # configure interrupt setting for a specific pin. set on or off
@@ -240,13 +244,15 @@ class MCP23017(object):
                 
     # check to see if there is an interrupt pending 3 times in a row (indicating it's stuck)
     # and if needed clear the interrupt without reading values
+    # return 0 if everything is ok
+    # return 1 if the interrupts had to be forcefully cleared
     def clearInterrupts(self):
         if self.i2c.readU8(MCP23017_INTFA) > 0 or self.i2c.readU8(MCP23017_INTFB) > 0:
             iterations=3
             count=1
             # loop to check multiple times to lower chance of false positive
             while count <= iterations:
-                if self.i2c.readU8(MCP23017_INTFA) == 0 and self.i2c.readU8(MCP23017_INTFB) == 0: break
+                if self.i2c.readU8(MCP23017_INTFA) == 0 and self.i2c.readU8(MCP23017_INTFB) == 0: return 0
                 else:
                     time.sleep(.5)
                     count+=1
@@ -254,6 +260,7 @@ class MCP23017(object):
             if count >= iterations:
                 self.i2c.readU8(MCP23017_GPIOA)
                 self.i2c.readU8(MCP23017_GPIOB)
+                return 1
     # cleanup function - set values everything to safe values
     # should be called when program is exiting
     def cleanup(self):
