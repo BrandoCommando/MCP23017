@@ -270,7 +270,10 @@ def setupMCP(addy,callpin):
 	if(verbose):
 		print("Callback: %s: %s" % (addy, callpin))
 	mcp = MCP23017(address = addy, num_gpios = 16)
-	mcp.configSystemInterrupt(mcp.INTMIRRORON, mcp.INTPOLACTIVEHIGH)
+	if(mcp.connected != 1):
+		print("Unable to setup MCP on %s" % addy)
+		return [-1,[]]
+	success = mcp.configSystemInterrupt(mcp.INTMIRRORON, mcp.INTPOLACTIVEHIGH)
 	states = []
 	for pin in range(0,16):
 		mcp.pinMode(pin, mcp.INPUT)

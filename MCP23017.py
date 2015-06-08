@@ -56,7 +56,11 @@ class MCP23017(object):
         self.num_gpios = num_gpios
 
         # set defaults
-        self.i2c.write8(MCP23017_IODIRA, 0xFF)  # all inputs on port A
+        if(self.i2c.write8(MCP23017_IODIRA, 0xFF)==-1): # all inputs on port A
+        	self.connected = 0
+        	return
+        else:
+        	self.connected = 1
         self.i2c.write8(MCP23017_IODIRB, 0xFF)  # all inputs on port B
         
 	# read the current direction of all pins into instance variable
@@ -180,7 +184,7 @@ class MCP23017(object):
         # set the intpol bit
         registerValue = self._changeBit(registerValue, self.IOCONINTPOL, intpol)
         # set ODR pin
-        self.i2c.write8(MCP23017_IOCON, registerValue)
+        return self.i2c.write8(MCP23017_IOCON, registerValue)
         
     # configure interrupt setting for a specific pin. set on or off
     def configPinInterrupt(self, pin, enabled, compareMode = 0, defval = 0):
