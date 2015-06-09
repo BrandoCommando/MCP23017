@@ -48,10 +48,10 @@ class MCP23017(object):
     IOCONINTPOL = 1
 
     # set defaults
-    def __init__(self, address, num_gpios, busnum=-1):
+    def __init__(self, address, num_gpios, busnum=-1, debug=False):
         assert num_gpios >= 0 and num_gpios <= 16, "Number of GPIOs must be between 0 and 16"
 	# busnum being negative will have Adafruit_I2C figure out what is appropriate for your Pi
-        self.i2c = Adafruit_I2C(address=address, busnum=busnum)
+        self.i2c = Adafruit_I2C(address=address, busnum=busnum, debug=debug)
         self.address = address
         self.num_gpios = num_gpios
 

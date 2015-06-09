@@ -11,17 +11,18 @@ import time
 import subprocess
 
 keymap = [
-	e.KEY_1, e.KEY_LEFT, e.KEY_UP, e.KEY_RIGHT, e.KEY_DOWN, e.KEY_ENTER, e.KEY_SPACE, e.KEY_HOME, e.KEY_END, e.KEY_PAGEUP, e.KEY_PAGEDOWN,
-	e.KEY_2, e.KEY_A, e.KEY_W, e.KEY_D, e.KEY_S, e.KEY_F, e.KEY_R, e.KEY_G, e.KEY_T, e.KEY_H, e.KEY_Y,
-	e.KEY_3, e.KEY_J, e.KEY_I, e.KEY_L, e.KEY_K, e.KEY_7, e.KEY_U, e.KEY_8, e.KEY_9,
-	e.KEY_4, e.KEY_Z, e.KEY_X, e.KEY_C, e.KEY_B, e.KEY_N, e.KEY_M, e.KEY_Q, e.KEY_E
+	e.KEY_5, e.KEY_1, e.KEY_LEFT, e.KEY_UP, e.KEY_RIGHT, e.KEY_DOWN, e.KEY_ENTER, e.KEY_SPACE, e.KEY_HOME, e.KEY_END, e.KEY_PAGEUP, e.KEY_PAGEDOWN,
+	e.KEY_6, e.KEY_2, e.KEY_A, e.KEY_W, e.KEY_D, e.KEY_S, e.KEY_F, e.KEY_R, e.KEY_G, e.KEY_T, e.KEY_H, e.KEY_Y,
+	e.KEY_7, e.KEY_3, e.KEY_J, e.KEY_I, e.KEY_L, e.KEY_K, e.KEY_7, e.KEY_U, e.KEY_8, e.KEY_9,
+	e.KEY_8, e.KEY_4, e.KEY_Z, e.KEY_X, e.KEY_C, e.KEY_B, e.KEY_N, e.KEY_M, e.KEY_Q, e.KEY_E
 	]
 btnmap = []
-goodgpios=[4,7,8,9,10,11,14,15,17,18,22,23,24,25,27,28]
+#goodgpios=[4,7,8,9,10,11,14,15,17,18,22,23,24,25,27,28]
+goodgpios=[4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27]
 gpios = []
 #mcps = [[0x25,4,0,0,[]],[0x26,27,16,0,[]]]
 mcps = []
-labels = ["start","left","up","right","down","topleft","botleft","topmid","botmid","toprt","botrt"]
+labels = ["coin","start","left","up","right","down","topleft","botleft","topmid","botmid","toprt","botrt"]
 gpiostate = {}
 gpiopins = []
 callbacks = []
@@ -35,16 +36,18 @@ def readconfig():
 	fh.close()
 	if (len(data)==0):
 		fh = open("inter.cfg","w+")
-		fh.write(",".join(str(x) for x in range(0,40)))
+		fh.write(",".join(str(x) for x in range(0,44)))
 		fh.close()
 	if (len(data)>0):
 		l1 = data[0].rstrip().split(",")
-		if (len(l1)==40):
+		if (len(l1)==(4*len(labels))-4):
 			bmi=-1
 			for x in l1:
 				bmi = bmi + 1
 				btnmap.append(int(x))
 			print("Button Config Loaded: %s" % (",".join(str(x) for x in btnmap)))
+		else:
+			print("Bad Button config length: %d != %d" % (len(l1),(4*len(labels))-4))
 	if (len(data)>1):
 		l2 = data[1].rstrip().split(",")
 		for x in l2:
@@ -86,8 +89,8 @@ def setup():
 	for mcpi in range(0,len(mcps)):
 		if(type(mcps[mcpi][3]).__name__=="MCP23017"):
 			mcps[mcpi][3].cleanup()
-	for pin in goodgpios:
-		GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+# 	for pin in goodgpios:
+# 		GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 	for addy in i2cs:
 		while True:
 			gpio=input("Enter callback pin for MCP at %s: " % (addy))
@@ -115,7 +118,8 @@ def setup():
 		mcps[mcpi][4] = mcp[1]
 	for pin in goodgpios:
 		if(str(pin) not in callbacks):
-			GPIO.setup(pin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+			gpiostate[pin] = getgpio(pin)
+			# GPIO.setup(pin, GPIO.IN, pull_up_down = GPIO.PUD_UP)
 		
 	bmi = -1
 	for player in range(1,5):
@@ -123,7 +127,7 @@ def setup():
 		lbli = 0
 		for label in labels:
 			lbli = lbli + 1
-			if (player > 2 and lbli > 9):
+			if (player > 2 and lbli > len(labels) - 2):
 				continue
 			bmi = bmi + 1
 			if(bmi in btnmap):
@@ -138,7 +142,7 @@ def setup():
 				else:
 					print("Button %s already used" % btn)
 					time.sleep(0.5)
-			print("Button pressed: %s" % (btn))
+# 			print("Button pressed: %s" % (btn))
 			btnmap[bmi] = btn
 			time.sleep(0.5)
 
@@ -160,6 +164,8 @@ def setup():
 	fh.write("%s\n" % ",".join(callbacks))
 	
 	fh.close()
+	
+	print("Done writing to inter.cfg")
 
 def getgpio(pin):
 	if (str(pin) in callbacks):
@@ -174,7 +180,7 @@ def getgpio(pin):
 	elif (pin >= 32):
 		mcpi = int(pin / 32) - 1
 		pin = pin % 16
-		if(mcpi in mcps and type(mcps[mcpi][3]).__name__=="MCP23017"):
+		if(mcpi in mcps and type(mcps[mcpi][3]).__name__=="MCP23017" and mcps[mcpi][3].connected == 1):
 			state = mcps[mcpi][3].input(pin)
 		else:
 			return -1
@@ -192,6 +198,8 @@ def pollall(prompt=False, mcp=True):
 		for mcpi in range(0,len(mcps)):
 			mcp = mcps[mcpi][3]
 			if(type(mcp).__name__!="MCP23017"):
+				continue
+			if(mcp.connected != 1):
 				continue
 			for ch in range(0,16):
 				pin=32+(16*mcpi)+ch
@@ -215,6 +223,10 @@ def pollall(prompt=False, mcp=True):
 			continue
 		for mcpi in range(0,len(mcps)):
 			mcp = mcps[mcpi][3]
+			if(type(mcp).__name__!="MCP23017"):
+				continue
+			if(mcp.connected != 1):
+				continue
 			for ch in range(0,16):
 				pin=32+(16*mcpi)+ch
 				val=mcp.input(ch)
@@ -290,6 +302,7 @@ def cleanup():
 		mcp = MCP23017(address = addy, num_gpios = 16)
 		mcp.cleanup()
 	GPIO.cleanup()
+	print("All cleaned up.")
 
 try:
 	ui = UInput(name="retrogame")
