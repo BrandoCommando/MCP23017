@@ -85,7 +85,10 @@ def setup():
 	taken = []
 	i2cs = i2cd()
 	callbacks = []
-	print("Found I2C devices: %s" % (", ".join(str(x) for x in i2cs)))
+	if(i2cs!=""):
+		print("Found I2C devices: %s" % (", ".join(str(x) for x in i2cs)))
+	else:
+		print("No I2C devices found!")
 	for mcpi in range(0,len(mcps)):
 		if(type(mcps[mcpi][3]).__name__=="MCP23017"):
 			mcps[mcpi][3].cleanup()
@@ -344,7 +347,11 @@ try:
 
 	else:
 		# regular GPIO wait for interrupts
-		GPIO.wait_for_interrupts(threaded=True)
+		if(len(mcps)>0):
+			thread=True
+		else:
+			thread=False
+		GPIO.wait_for_interrupts(threaded=thread)
 		while (True):
 			time.sleep(.5)
 # 			mcp.output(ledpin, 1)
