@@ -138,13 +138,18 @@ def setup():
 			else:
 				cur = 0
 			while True:
-				btn=pollall("Press button for %s %s [%s]: " % (ps, label, cur))
-				if(btn not in taken):
-					taken.append(btn)
+				try:
+					btn=pollall("Press button for %s %s [%s]: " % (ps, label, cur))
+					if(btn not in taken):
+						taken.append(btn)
+						break
+					else:
+						print("Button %s already used" % btn)
+						time.sleep(0.5)
+				except Exception as be:
+					btn=0
+					print("Skipped")
 					break
-				else:
-					print("Button %s already used" % btn)
-					time.sleep(0.5)
 # 			print("Button pressed: %s" % (btn))
 			btnmap[bmi] = btn
 			time.sleep(0.5)
@@ -240,46 +245,76 @@ def pollall(prompt=False, mcp=True):
 						print(pin)
 					return pin
 
+def getlabel(pin):
+	lbli=pin%len(labels)
+	pl=math.floor(pin/len(labels)) + 1
+	if(pin>32):
+		lbli=(pin-33)%len(labels)
+		pl=math.floor((pin-32)/len(labels)) + 1
+	lbl=labels[lbli]
+	return lbl
+
+def bold(s):
+	return "\033[1m%s\033[0m" % s
+
+def showbtnstate():
+	state=""
+	for pin in btnmap:
+		if(pin not in gpiostate):
+			gpiostate[pin] = getgpio(pin)
+		if(gpiostate[pin]):
+			state+="0"
+		else:
+			state+="1"
+	sys.stdout.write("Buttons: %s" % state)
+	sys.stdout.write('\r')
+	sys.stdout.flush()
+
 # interrupt callback function
 # just get the pin and values and print them
 def intcall(k, val):
 	mcpi=-1
 	for mcpa in mcps:
+		if(mcpa[1]!=k):
+			continue
 		if(type(mcpa[3]).__name__!="MCP23017"):
 			continue
 		mcpi = mcpi + 1
 		pin, value = mcpa[3].readInterrupt()
 		if (type(pin).__name__=="int"):
 			pin = 32+(mcpi*16)+pin;
+			gpiostate[pin] = value;
 			gpin=pin
 			if(pin in btnmap):
 				pin=btnmap.index(pin)
 			kc=keymap[pin]
-			if (verbose):
-				lbli=pin%10
-				pl=math.floor(pin/11) + 1
-				if(pin>32):
-					lbli=(pin-33)%10
-					pl=math.floor((pin-20)/10) + 1
-				lbl=labels[lbli]
-				if (value==0):
-					print("I(%d) %s %s %s %s %s %s" % (mcpi + 1, gpin, pin, value, kc, pl, lbl))
-			ui.write(e.EV_KEY, kc, 1 - value)
-			ui.syn()
+			if (verbose==1):
+				print("I(%d) %s %s %s %s %s" % (mcpi + 1, gpin, pin, value, kc, getlabel(pin)))
+			elif(verbose==2):
+				showbtnstate()
+			else:
+				ui.write(e.EV_KEY, kc, 1 - value)
+				ui.syn()
+		elif(verbose==1):
+			print("Bad interrupt? (%s,%s,%s,%s)" % (k,val,pin,value))
 		
 def btncall(pin, value):
 # 	if (type(pin).__name__=="int"):
 	gpin=pin
+	gpiostate[pin] = value;
 	if(pin in btnmap):
 		pin = btnmap.index(pin)
 # 	if(bm not in keymap):
 # 		print("%s not found" % bm)
 # 		return
 	kc = keymap[pin]
-	if (verbose and value==0):
-		print("G(%d) %s %s %s" % (gpin, pin, value, kc))
-	ui.write(e.EV_KEY, kc, 1 - value)
-	ui.syn()
+	if (verbose==1):
+		print("G(%d) %s %s %s %s" % (gpin, pin, value, kc, getlabel(pin)))
+	elif (verbose==2):
+		showbtnstate()
+	else:
+		ui.write(e.EV_KEY, kc, 1 - value)
+		ui.syn()
 	
 def setupMCP(addy,callpin):
 	if(verbose):
@@ -296,7 +331,7 @@ def setupMCP(addy,callpin):
 		mcp.configPinInterrupt(pin, mcp.INTERRUPTON, mcp.INTERRUPTCOMPAREPREVIOUS)
 		val = mcp.input(pin)
 		states.append(mcp.input(pin))
-	GPIO.add_interrupt_callback(callpin, intcall, edge='both', pull_up_down = GPIO.PUD_DOWN)
+	GPIO.add_interrupt_callback(callpin, intcall, edge='rising', pull_up_down = GPIO.PUD_DOWN)
 	gpiostate[callpin] = 2
 	return [mcp,states]
 	
@@ -322,6 +357,8 @@ try:
 		setup()
 	if (len(sys.argv) == 2 and sys.argv[1] == "verbose"):
 		verbose = 1
+	if (len(sys.argv) == 2 and sys.argv[1] == "state"):
+		verbose = 2
 	
 	for mcpi in range(0,len(i2cs)):
 		addy=i2cs[mcpi]
@@ -336,10 +373,10 @@ try:
 	for pin in gpios:
 		if (type(pin).__name__!="int" or pin == 0):
 			continue
-		if (verbose):
+		if (verbose == 1):
 			print("Setting up %s" % pin)
 		GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-		if (verbose):
+		if (verbose == 1):
 			print("%s %s" % (pin, GPIO.input(pin)))
 		if (mode == 1):
 			GPIO.add_interrupt_callback(pin, btncall, edge='both', pull_up_down=GPIO.PUD_UP)
@@ -349,13 +386,17 @@ try:
 
 	else:
 		# regular GPIO wait for interrupts
+		if (verbose == 2):
+			for pin in gpios:
+				gpiostate[pin] = getgpio(pin)
+			showbtnstate();
 		if(len(mcps)>0):
 			thread=True
 		else:
 			thread=False
 		GPIO.wait_for_interrupts(threaded=thread)
 		while (True):
-			time.sleep(.5)
+			time.sleep(.1)
 # 			mcp.output(ledpin, 1)
 # 			time.sleep(.2)
 # 			mcp.output(ledpin, 0)
@@ -365,7 +406,7 @@ try:
 			# three times in a row, .5 seconds apart. if it gets to the end of 3 
 			# iterations, we're probably stuck so it will reset
 			for mcpa in mcps:
-				if (type(mcpa[3]).__name__=="MCP23017"):
+				if(type(mcpa[3]).__name__=="MCP23017"):
 					mcpa[3].clearInterrupts()
 
 except Exception as e:
