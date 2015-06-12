@@ -334,6 +334,8 @@ try:
 		mcps[mcpi][4] = mcpp[1]
 	
 	for pin in gpios:
+		if (type(pin).__name__!="int" or pin == 0):
+			continue
 		if (verbose):
 			print("Setting up %s" % pin)
 		GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
